@@ -1,5 +1,5 @@
-import FinanceDashboard from '../components/FinanceDashboard';
+import TabNavigation from '../components/TabNavigation';
 
 export default function Home() {
-  return <FinanceDashboard />;
+  return <TabNavigation />;
 }
