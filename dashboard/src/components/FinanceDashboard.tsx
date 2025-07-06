@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,6 +14,14 @@ import {
   ArcElement,
 } from 'chart.js';
 import { Line, Bar, Pie, Doughnut } from 'react-chartjs-2';
+import DateRangePicker from './DateRangePicker';
+import { DateRange } from '../types/dashboard';
+import {
+  generateDashboardData,
+  filterDataByDateRange,
+  aggregateToMonthly,
+  formatDateForChart,
+} from '../utils/dataUtils';
 
 ChartJS.register(
   CategoryScale,
@@ -28,21 +36,53 @@ ChartJS.register(
 );
 
 const FinanceDashboard = () => {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
+  const [dateRange, setDateRange] = useState<DateRange>(() => {
+    const today = new Date();
+    const startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+    return { startDate, endDate };
+  });
+
+  const baseData = useMemo(() => generateDashboardData(), []);
+
+  const filteredData = useMemo(() => {
+    const revenueFiltered = filterDataByDateRange(baseData.revenue, dateRange);
+    const expensesFiltered = filterDataByDateRange(baseData.expenses, dateRange);
+    const portfolioFiltered = filterDataByDateRange(baseData.portfolio, dateRange);
+
+    const revenueMonthly = aggregateToMonthly(revenueFiltered);
+    const expensesMonthly = aggregateToMonthly(expensesFiltered);
+    const portfolioMonthly = aggregateToMonthly(portfolioFiltered);
+
+    const expenseBreakdownFiltered = Object.entries(baseData.expenseBreakdown).map(
+      ([category, data]) => {
+        const filtered = filterDataByDateRange(data, dateRange);
+        const total = filtered.reduce((sum, point) => sum + point.value, 0);
+        return { category, total };
+      }
+    );
+
+    return {
+      revenue: revenueMonthly,
+      expenses: expensesMonthly,
+      portfolio: portfolioMonthly,
+      expenseBreakdown: expenseBreakdownFiltered,
+    };
+  }, [baseData, dateRange]);
+
   const revenueData = {
-    labels: months,
+    labels: filteredData.revenue.map((point) => formatDateForChart(point.date)),
     datasets: [
       {
         label: 'Revenue ($)',
-        data: [65000, 59000, 80000, 81000, 56000, 75000, 90000, 85000, 70000, 95000, 88000, 102000],
+        data: filteredData.revenue.map((point) => point.value),
         borderColor: 'rgb(75, 192, 192)',
         backgroundColor: 'rgba(75, 192, 192, 0.2)',
         tension: 0.1,
       },
       {
         label: 'Expenses ($)',
-        data: [45000, 42000, 55000, 58000, 40000, 52000, 65000, 60000, 48000, 68000, 62000, 72000],
+        data: filteredData.expenses.map((point) => point.value),
         borderColor: 'rgb(255, 99, 132)',
         backgroundColor: 'rgba(255, 99, 132, 0.2)',
         tension: 0.1,
@@ -51,11 +91,11 @@ const FinanceDashboard = () => {
   };
 
   const portfolioData = {
-    labels: months,
+    labels: filteredData.portfolio.map((point) => formatDateForChart(point.date)),
     datasets: [
       {
         label: 'Portfolio Value ($)',
-        data: [250000, 265000, 245000, 280000, 295000, 275000, 310000, 325000, 305000, 340000, 355000, 375000],
+        data: filteredData.portfolio.map((point) => point.value),
         backgroundColor: 'rgba(54, 162, 235, 0.8)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1,
@@ -64,10 +104,10 @@ const FinanceDashboard = () => {
   };
 
   const expenseBreakdownData = {
-    labels: ['Marketing', 'Operations', 'Salaries', 'Technology', 'Office', 'Other'],
+    labels: filteredData.expenseBreakdown.map((item) => item.category),
     datasets: [
       {
-        data: [15000, 25000, 35000, 12000, 8000, 5000],
+        data: filteredData.expenseBreakdown.map((item) => item.total),
         backgroundColor: [
           '#FF6384',
           '#36A2EB',
@@ -106,6 +146,11 @@ const FinanceDashboard = () => {
     ],
   };
 
+  const totalRevenue = filteredData.revenue.reduce((sum, point) => sum + point.value, 0);
+  const totalExpenses = filteredData.expenses.reduce((sum, point) => sum + point.value, 0);
+  const netProfit = totalRevenue - totalExpenses;
+  const currentPortfolioValue = filteredData.portfolio[filteredData.portfolio.length - 1]?.value || 0;
+
   const chartOptions = {
     responsive: true,
     plugins: {
@@ -134,6 +179,11 @@ const FinanceDashboard = () => {
       <div className="max-w-7xl mx-auto">
         <h1 className="text-4xl font-bold text-gray-900 mb-8">Finance Dashboard</h1>
         
+        <DateRangePicker
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+        />
+        
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">Revenue vs Expenses</h2>
@@ -148,7 +198,7 @@ const FinanceDashboard = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">Monthly Expense Breakdown</h2>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4">Expense Breakdown</h2>
             <Pie data={expenseBreakdownData} options={pieOptions} />
           </div>
           
@@ -161,20 +211,20 @@ const FinanceDashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Total Revenue</h3>
-            <p className="text-3xl font-bold text-green-600">$966,000</p>
-            <p className="text-sm text-gray-500">+12% from last year</p>
+            <p className="text-3xl font-bold text-green-600">${totalRevenue.toLocaleString()}</p>
+            <p className="text-sm text-gray-500">For selected period</p>
           </div>
           
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Net Profit</h3>
-            <p className="text-3xl font-bold text-blue-600">$295,000</p>
-            <p className="text-sm text-gray-500">+18% from last year</p>
+            <p className="text-3xl font-bold text-blue-600">${netProfit.toLocaleString()}</p>
+            <p className="text-sm text-gray-500">For selected period</p>
           </div>
           
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Portfolio Value</h3>
-            <p className="text-3xl font-bold text-purple-600">$375,000</p>
-            <p className="text-sm text-gray-500">+15% from last year</p>
+            <p className="text-3xl font-bold text-purple-600">${currentPortfolioValue.toLocaleString()}</p>
+            <p className="text-sm text-gray-500">Current value</p>
           </div>
         </div>
       </div>
