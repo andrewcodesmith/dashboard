@@ -9,14 +9,28 @@ body {
 
 html:not(.dark),
 body:not(.dark) {
-  background: #ffffff;
-  color: #171717;
+  background: #ffffff !important;
+  color: #171717 !important;
 }
 
 html.dark,
 body.dark {
-  background: #0a0a0a;
-  color: #ededed;
+  background: #0a0a0a !important;
+  color: #ededed !important;
+}
+
+html:not(.dark) .min-h-screen.bg-gray-50,
+body:not(.dark) .min-h-screen.bg-gray-50,
+html:not(.dark) .min-h-screen,
+body:not(.dark) .min-h-screen {
+  background: #ffffff !important;
+}
+
+html.dark .min-h-screen.bg-gray-50,
+body.dark .min-h-screen.bg-gray-50,
+html.dark .min-h-screen,
+body.dark .min-h-screen {
+  background: #0a0a0a !important;
 }
 
 :root {
